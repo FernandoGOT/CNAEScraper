@@ -3,12 +3,7 @@
 Scraper for Classificação Nacional de Atividades Econômicas (CNAE) on website CNAEWeb from IBGE
 
 ## Getting Started
-Install the module with: `npm install cnaescraper`
-
-```javascript
-var cnaescraper = require('cnaescraper');
-cnaescraper.awesome(); // "awesome"
-```
+_(Coming soon)_
 
 ## Documentation
 _(Coming soon)_
