@@ -4,6 +4,7 @@ var cheerio = require('cheerio');
 var iconv = require('iconv-lite');
 var jschardet = require("jschardet");
 var mongoose = require('mongoose');
+var XLSX = require('xlsx')
 
 var options = {
     baseUrl: 'http://www.cnae.ibge.gov.br/',
@@ -47,6 +48,30 @@ var cnaeSchema = new mongoose.Schema({
     versionKey: false
 });
 var Cnae = mongoose.model('Cnae', cnaeSchema);
+
+var importCnaes = function() {
+  var workbook = XLSX.readFile("cnaes.xlsx");
+  var sheet = workbook.Sheets[workbook.SheetNames[0]];
+  var rowsCount = XLSX.utils.decode_range(sheet["!ref"]).e.r;
+
+  for (var n = 2; n < rowsCount+2; n++) {
+    var item = {
+      cnae: sheet['B' + n],
+      descricao: sheet['C' + n],
+      anexo: sheet['D' + n],
+      aliquota: sheet['E' + n],
+      mei: sheet['F' + n],
+      atividadeMei: sheet['G' + n],
+      fundamento: sheet['H' + n],
+      impedido: sheet['I' + n],
+      concomitante: sheet['J' + n]
+    };
+
+
+  }
+}
+
+importCnaes();
 
 var scrapAtividades = function(item) {
 
@@ -350,25 +375,3 @@ var scrapSecoes = function () {
     }).form(form);
 
 };
-
-
-scrapSecoes();
-
-
-
-    // To write to the system we will use the built in 'fs' library.
-    // In this example we will pass 3 parameters to the writeFile function
-    // Parameter 1 :  output.json - this is what the created filename will be called
-    // Parameter 2 :  JSON.stringify(json, null, 4) - the data to write, here we do an extra step by calling JSON.stringify to make our JSON easier to read
-    // Parameter 3 :  callback function - a callback function to let us know the status of our function
-/*
-    fs.writeFile('output.json', JSON.stringify(json, null, 4), function(err){
-
-        console.log('File successfully written! - Check your project directory for the output.json file');
-
-    })
-*/
-    // Finally, we'll just send out a message to the browser reminding you that this app does not have a UI.
-    //res.send('Check your console!')
-
-//exports = module.exports = app;
