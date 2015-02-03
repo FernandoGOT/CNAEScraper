@@ -1,6 +1,4 @@
-var express = require('express');
 var fs = require('fs');
-var deferred = require('deferred');
 var request = require('request');
 var cheerio = require('cheerio');
 var iconv = require('iconv-lite');
@@ -21,7 +19,7 @@ var options = {
 var form = {
     'sourcepage':'index',
     'pesquisa':'',
-    'tabelabusca': 'CNAE_201@CNAE 2.1 - Subclasses@0@cnaefiscal@0',
+    'tabelabusca': 'CNAE_202@CNAE 2.2 - Subclasses@0@cnaefiscal@0',
     'tipoordenacao':'C'
 };
 
@@ -112,12 +110,26 @@ var scrapSubclasses = function(item) {
                     classe: item,
                     codigo: data.text(),
                     descricao: descricaoEl.text().capitalize(),
-                    href: options.baseUrl + "pesquisa.asp?TabelaBusca=CNAE_201@CNAE%202.1%20-%20Subclasses@0@cnaefiscal@0&source=subclasse&pesquisa=" + data.text().replace("-","").replace("/",""),
+                    href: options.baseUrl + "pesquisa.asp?TabelaBusca=CNAE_202@CNAE%202.2%20-%20Subclasses@0@cnaefiscal@0&source=subclasse&pesquisa=" + data.text().replace("-","").replace("/",""),
                     atividades: []
                 };
 
                 item.subclasses.push(subclasse);
                 scrapAtividades(subclasse);
+
+                var subclasseCnae = new Cnae({
+                  _id: subclasse.codigo,
+                  Secao: item.grupo.divisao.secao.codigo,
+                  Divisao: item.grupo.divisao.codigo,
+                  Grupo: item.grupo.codigo,
+                  Classe: item.codigo,
+                  Subclasse: subclasse.codigo,
+                  Descricao: capitalize(subclasse.descricao)
+                });
+
+                subclasseCnae.save(function(err, ret) {
+                  if (err) return console.error(err);
+                });
             });
         }
     });
@@ -154,11 +166,25 @@ var scrapClasses = function(item) {
                     item.classes.push(classe);
                     scrapSubclasses(classe);
 
-                    /*console.log(classe.grupo.divisao.secao.codigo + " " +
+                    var classeCnae = new Cnae({
+                      _id: classe.codigo,
+                      Secao: item.divisao.secao.codigo,
+                      Divisao: item.divisao.codigo,
+                      Grupo: item.codigo,
+                      Classe: classe.codigo,
+                      Subclasse: 0,
+                      Descricao: capitalize(classe.descricao)
+                    });
+
+                    // classeCnae.save(function(err, ret) {
+                    //   if (err) return console.error(err);
+                    // });
+
+                    console.log(classe.grupo.divisao.secao.codigo + " " +
                                 classe.grupo.divisao.codigo + " " +
                                 classe.grupo.codigo + " " +
                                 classe.codigo + " " +
-                                classe.descricao);*/
+                                classe.descricao);
                 }
             });
         }
@@ -193,10 +219,24 @@ var scrapGrupos = function(item) {
                     item.grupos.push(grupo);
                     scrapClasses(grupo);
 
-                    /*console.log(grupo.divisao.secao.codigo + " " +
+                    var grupoCnae = new Cnae({
+                      _id: grupo.codigo,
+                      Secao: item.secao.codigo,
+                      Divisao: item.codigo,
+                      Grupo: grupo.codigo,
+                      Classe: 0,
+                      Subclasse: 0,
+                      Descricao: capitalize(grupo.descricao)
+                    });
+
+                    // grupoCnae.save(function(err, ret) {
+                    //   if (err) return console.error(err);
+                    // });
+
+                    console.log(grupo.divisao.secao.codigo + " " +
                                 grupo.divisao.codigo + " " +
                                 grupo.codigo + " " +
-                                grupo.descricao);*/
+                                grupo.descricao);
                 }
             });
         }
@@ -231,9 +271,23 @@ var scrapDivisoes = function(item) {
                     item.divisoes.push(divisao);
                     scrapGrupos(divisao);
 
-                    /*console.log(divisao.secao.codigo + " " +
+                    var divisaoCnae = new Cnae({
+                      _id: divisao.codigo,
+                      Secao: item.codigo,
+                      Divisao: divisao.codigo,
+                      Grupo: 0,
+                      Classe: 0,
+                      Subclasse: 0,
+                      Descricao: capitalize(divisao.descricao)
+                    });
+
+                    // divisaoCnae.save(function(err, ret) {
+                    //   if (err) return console.error(err);
+                    // });
+
+                    console.log(divisao.secao.codigo + " " +
                                 divisao.codigo + " " +
-                                divisao.descricao);*/
+                                divisao.descricao);
                 }
 
             });
@@ -244,7 +298,12 @@ var scrapDivisoes = function(item) {
 
 var scrapSecoes = function () {
 
-    request.post(options, function(error, response, html){
+    console.log('scrapSecoes');
+
+    options.headers['Content-Length'] = Buffer.byteLength("sourcepage=index&pesquisa=&tabelabusca=CNAE_202%40CNAE+2.2+-+Subclasses%400%40cnaefiscal%400&tipoordenacao=C");
+
+    request.post(options, function(error, response, html) {
+        console.log('return');
         if(!error) {
             html = iconv.decode(html, jschardet.detect(html).encoding);
 
@@ -266,10 +325,27 @@ var scrapSecoes = function () {
                     secoes.push(secao);
                     scrapDivisoes(secao);
 
-                    /*console.log(secao.codigo + " " +
-                                secao.descricao);*/
+                    var secaoCnae = new Cnae({
+                      _id: secao.codigo,
+                      Secao: secao.codigo,
+                      Divisao: 0,
+                      Grupo: 0,
+                      Classe: 0,
+                      Subclasse: 0,
+                      Descricao: capitalize(secao.descricao)
+                    });
+
+                    /*secaoCnae.save(function(err, ret) {
+                      if (err) return console.error(err);
+                    });*/
+
+                    console.log(secao.codigo + " " +
+                                secao.descricao);
                 }
             });
+        }
+        else {
+          console.log(request, options, error);
         }
     }).form(form);
 
