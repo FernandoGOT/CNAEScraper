@@ -4,7 +4,7 @@ var cheerio = require('cheerio');
 var iconv = require('iconv-lite');
 var jschardet = require("jschardet");
 var mongoose = require('mongoose');
-var XLSX = require('xlsx')
+var XLSX = require('xlsx');
 
 var options = {
     baseUrl: 'http://www.cnae.ibge.gov.br/',
@@ -42,7 +42,16 @@ var cnaeSchema = new mongoose.Schema({
     Grupo: Number,
     Classe: String,
     Subclasse: String,
-    Descricao: String
+    Descricao: String,
+    Fundamento: String,
+    Aliquota: String,
+    SimplesNacional: {
+      Anexo: String,
+      Impedido: Boolean,
+      Concomitante: Boolean,
+      Mei: Boolean,
+      MeiAtividade: String,
+    }
 }, {
     collection: "Tabela_Cnae",
     versionKey: false
@@ -54,22 +63,55 @@ var importCnaes = function() {
   var sheet = workbook.Sheets[workbook.SheetNames[0]];
   var rowsCount = XLSX.utils.decode_range(sheet["!ref"]).e.r;
 
-  for (var n = 2; n < rowsCount+2; n++) {
+console.log(rowsCount);
+
+  for (var n = 2; n <= rowsCount+2; n++) {
+
+    if (sheet['B' + n] === undefined)
+      continue;
+
     var item = {
-      cnae: sheet['B' + n],
-      descricao: sheet['C' + n],
-      anexo: sheet['D' + n],
-      aliquota: sheet['E' + n],
-      mei: sheet['F' + n],
-      atividadeMei: sheet['G' + n],
-      fundamento: sheet['H' + n],
-      impedido: sheet['I' + n],
-      concomitante: sheet['J' + n]
+      cnae: sheet['B' + n].v.toString(),
+      descricao: (sheet['C' + n]||"").v,
+      anexo: (sheet['D' + n]||"").v,
+      aliquota: (sheet['E' + n]||"").v,
+      mei: (sheet['F' + n]||"").v,
+      atividadeMei: (sheet['G' + n]||"").v,
+      fundamento: (sheet['H' + n]||"").v,
+      impedido: (sheet['I' + n]||"").v,
+      concomitante: (sheet['J' + n]||"").v
     };
 
+    if (item.cnae.length == 0) {
+      continue;
+    }
 
+    var atividade = new Cnae({
+        _id: item.cnae,
+        Secao: 0,
+        Divisao: 0,
+        Grupo: 0,
+        Classe: item.cnae.substring(0, item.cnae.toString().indexOf("/")),
+        Subclasse: item.cnae,
+        Descricao: capitalize(item.descricao),
+        Fundamento: item.fundamento,
+        Aliquota: item.aliquota,
+        SimplesNacional: {
+          Anexo: item.anexo,
+          Impedido: item.impedido == 'S',
+          Concomitante: item.concomitante == 'S',
+          Mei: item.mei === 'S',
+          MeiAtividade: item.atividadeMei,
+        }
+    });
+
+    atividade.save(function(err, thor) {
+      if (err) return console.error(err);
+      console.dir(thor._id + " " + thor.Descricao);
+    });
+    //console.log(atividade);
   }
-}
+};
 
 importCnaes();
 
