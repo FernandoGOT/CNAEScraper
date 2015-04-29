@@ -3,11 +3,10 @@ var request = require('request');
 var cheerio = require('cheerio');
 var iconv = require('iconv-lite');
 var jschardet = require("jschardet");
-var mongoose = require('mongoose');
 
 var options = {
     baseUrl: 'http://www.cnae.ibge.gov.br/',
-    url: 'http://www.cnae.ibge.gov.br/estrutura.asp',
+    url: 'estrutura.asp',
     headers: {
         'Referer': 'http://www.cnae.ibge.gov.br',
         'Origin': 'http://www.cnae.ibge.gov.br',
@@ -33,20 +32,10 @@ capitalize = function(text) {
 
 var secoes = [];
 
-mongoose.connect("mongodb://localhost/tabelas");
-var cnaeSchema = new mongoose.Schema({
-    _id: String,
-    Secao: String,
-    Divisao: Number,
-    Grupo: Number,
-    Classe: String,
-    Subclasse: String,
-    Descricao: String
-}, {
-    collection: "Tabela_Cnae",
-    versionKey: false
-});
-var Cnae = mongoose.model('Cnae', cnaeSchema);
+var saveData = function(item){
+  var path = until.format('%s/%s/%s.json', data.fiscalType, data.state, data.code);
+  fs.writeFileSync(path, iconvlite.encode(JSON.stringify(data), 'UTF-8'));
+}
 
 var scrapAtividades = function(item) {
 
@@ -71,21 +60,29 @@ var scrapAtividades = function(item) {
 
                 i++;
 
-                var atividade = new Cnae({
-                    _id: item.codigo + '-' + i,
-                    Secao: item.classe.grupo.divisao.secao.codigo,
-                    Divisao: item.classe.grupo.divisao.codigo,
-                    Grupo: item.classe.grupo.codigo,
-                    Classe: item.classe.codigo,
-                    Subclasse: item.codigo,
-                    Descricao: capitalize(descricao)
-                });
-
-                atividade.save(function(err, thor) {
-                  if (err) return console.error(err);
-                  console.dir(thor._id + " " + thor.Descricao);
-                });
+                item.atividades.push(capitalize(descricao));
             });
+
+            var subclasseCnae = ({
+              _id: item.codigo,
+              Secao: item.classe.grupo.divisao.secao.codigo,
+              Divisao: item.classe.grupo.divisao.codigo,
+              Grupo: item.classe.grupo.codigo,
+              Classe: item.classe.codigo,
+              Subclasse: item.codigo,
+              Descricao: capitalize(item.descricao),
+              Atividades: item.atividades,
+              Compreende: item.compreende,
+              CompreendeTambem: item.compreendeTambem,
+              NaoCompreende: item.naoCompreende
+            });
+
+            console.log(subclasseCnae);
+
+            // var compreende = $("td[width='95%']").text();
+            // console.log($("td[width='95%']"));
+            // console.log(item.href);
+
         }
     });
 
@@ -99,6 +96,12 @@ var scrapSubclasses = function(item) {
 
             var $ = cheerio.load(html);
 
+            var compreende = $("td[width='95%']").eq(0).text().trim();
+            var compreendeTambem = $("td[width='95%']").eq(1).text().trim();
+            var naoCompreende = $("td[width='95%']").eq(2).text().trim();
+
+
+
             $("td[width='105']").each(function() {
 
                 var parent = $(this).parent();
@@ -111,29 +114,29 @@ var scrapSubclasses = function(item) {
                     codigo: data.text(),
                     descricao: descricaoEl.text().capitalize(),
                     href: options.baseUrl + "pesquisa.asp?TabelaBusca=CNAE_202@CNAE%202.2%20-%20Subclasses@0@cnaefiscal@0&source=subclasse&pesquisa=" + data.text().replace("-","").replace("/",""),
+                    compreende: capitalize(compreende),
+                    compreendeTambem : capitalize(compreendeTambem),
+                    naoCompreende: capitalize(naoCompreende),
                     atividades: []
                 };
+
+                // console.log(subclasse);
 
                 item.subclasses.push(subclasse);
                 scrapAtividades(subclasse);
 
-                var subclasseCnae = new Cnae({
-                  _id: subclasse.codigo,
-                  Secao: item.grupo.divisao.secao.codigo,
-                  Divisao: item.grupo.divisao.codigo,
-                  Grupo: item.grupo.codigo,
-                  Classe: item.codigo,
-                  Subclasse: subclasse.codigo,
-                  Descricao: capitalize(subclasse.descricao)
-                });
-
-                subclasseCnae.save(function(err, ret) {
-                  if (err) return console.error(err);
-                });
+                // var subclasseCnae = ({
+                //   _id: subclasse.codigo,
+                //   Secao: item.grupo.divisao.secao.codigo,
+                //   Divisao: item.grupo.divisao.codigo,
+                //   Grupo: item.grupo.codigo,
+                //   Classe: item.codigo,
+                //   Subclasse: subclasse.codigo,
+                //   Descricao: capitalize(subclasse.descricao)
+                // });
             });
         }
     });
-
 };
 
 var scrapClasses = function(item) {
@@ -166,25 +169,11 @@ var scrapClasses = function(item) {
                     item.classes.push(classe);
                     scrapSubclasses(classe);
 
-                    var classeCnae = new Cnae({
-                      _id: classe.codigo,
-                      Secao: item.divisao.secao.codigo,
-                      Divisao: item.divisao.codigo,
-                      Grupo: item.codigo,
-                      Classe: classe.codigo,
-                      Subclasse: 0,
-                      Descricao: capitalize(classe.descricao)
-                    });
-
-                    // classeCnae.save(function(err, ret) {
-                    //   if (err) return console.error(err);
-                    // });
-
-                    console.log(classe.grupo.divisao.secao.codigo + " " +
-                                classe.grupo.divisao.codigo + " " +
-                                classe.grupo.codigo + " " +
-                                classe.codigo + " " +
-                                classe.descricao);
+                    // console.log(classe.grupo.divisao.secao.codigo + " " +
+                    //             classe.grupo.divisao.codigo + " " +
+                    //             classe.grupo.codigo + " " +
+                    //             classe.codigo + " " +
+                    //             classe.descricao);
                 }
             });
         }
@@ -219,24 +208,10 @@ var scrapGrupos = function(item) {
                     item.grupos.push(grupo);
                     scrapClasses(grupo);
 
-                    var grupoCnae = new Cnae({
-                      _id: grupo.codigo,
-                      Secao: item.secao.codigo,
-                      Divisao: item.codigo,
-                      Grupo: grupo.codigo,
-                      Classe: 0,
-                      Subclasse: 0,
-                      Descricao: capitalize(grupo.descricao)
-                    });
-
-                    // grupoCnae.save(function(err, ret) {
-                    //   if (err) return console.error(err);
-                    // });
-
-                    console.log(grupo.divisao.secao.codigo + " " +
-                                grupo.divisao.codigo + " " +
-                                grupo.codigo + " " +
-                                grupo.descricao);
+                    // console.log(grupo.divisao.secao.codigo + " " +
+                    //             grupo.divisao.codigo + " " +
+                    //             grupo.codigo + " " +
+                    //             grupo.descricao);
                 }
             });
         }
@@ -271,23 +246,9 @@ var scrapDivisoes = function(item) {
                     item.divisoes.push(divisao);
                     scrapGrupos(divisao);
 
-                    var divisaoCnae = new Cnae({
-                      _id: divisao.codigo,
-                      Secao: item.codigo,
-                      Divisao: divisao.codigo,
-                      Grupo: 0,
-                      Classe: 0,
-                      Subclasse: 0,
-                      Descricao: capitalize(divisao.descricao)
-                    });
-
-                    // divisaoCnae.save(function(err, ret) {
-                    //   if (err) return console.error(err);
-                    // });
-
-                    console.log(divisao.secao.codigo + " " +
-                                divisao.codigo + " " +
-                                divisao.descricao);
+                    // console.log(divisao.secao.codigo + " " +
+                    //             divisao.codigo + " " +
+                    //             divisao.descricao);
                 }
 
             });
@@ -298,12 +259,12 @@ var scrapDivisoes = function(item) {
 
 var scrapSecoes = function () {
 
-    console.log('scrapSecoes');
+    // console.log('scrapSecoes');
 
     options.headers['Content-Length'] = Buffer.byteLength("sourcepage=index&pesquisa=&tabelabusca=CNAE_202%40CNAE+2.2+-+Subclasses%400%40cnaefiscal%400&tipoordenacao=C");
 
     request.post(options, function(error, response, html) {
-        console.log('return');
+        // console.log('return');
         if(!error) {
             html = iconv.decode(html, jschardet.detect(html).encoding);
 
@@ -325,27 +286,13 @@ var scrapSecoes = function () {
                     secoes.push(secao);
                     scrapDivisoes(secao);
 
-                    var secaoCnae = new Cnae({
-                      _id: secao.codigo,
-                      Secao: secao.codigo,
-                      Divisao: 0,
-                      Grupo: 0,
-                      Classe: 0,
-                      Subclasse: 0,
-                      Descricao: capitalize(secao.descricao)
-                    });
-
-                    /*secaoCnae.save(function(err, ret) {
-                      if (err) return console.error(err);
-                    });*/
-
-                    console.log(secao.codigo + " " +
-                                secao.descricao);
+                    // console.log(secao.codigo + " " +
+                    //             secao.descricao);
                 }
             });
         }
         else {
-          console.log(request, options, error);
+          // console.log(request, options, error);
         }
     }).form(form);
 
