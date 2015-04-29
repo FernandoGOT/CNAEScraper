@@ -2,7 +2,9 @@ var fs = require('fs');
 var request = require('request');
 var cheerio = require('cheerio');
 var iconv = require('iconv-lite');
-var jschardet = require("jschardet");
+var jschardet = require('jschardet');
+var util = require('util');
+var iconvlite = require('iconv-lite');
 
 var options = {
     baseUrl: 'http://www.cnae.ibge.gov.br/',
@@ -32,9 +34,11 @@ capitalize = function(text) {
 
 var secoes = [];
 
+var x = 0;
+
 var saveData = function(item){
-  var path = until.format('%s/%s/%s.json', data.fiscalType, data.state, data.code);
-  fs.writeFileSync(path, iconvlite.encode(JSON.stringify(data), 'UTF-8'));
+  var path = util.format('%s/%s.json', "CNAE", item.subclasse.replace("/", "").replace("-",""));
+  fs.writeFileSync(path, iconvlite.encode(JSON.stringify(item), 'UTF-8'));
 }
 
 var scrapAtividades = function(item) {
@@ -64,34 +68,60 @@ var scrapAtividades = function(item) {
             });
 
             var subclasseCnae = ({
-              _id: item.codigo,
-              Secao: item.classe.grupo.divisao.secao.codigo,
-              Divisao: item.classe.grupo.divisao.codigo,
-              Grupo: item.classe.grupo.codigo,
-              Classe: item.classe.codigo,
-              Subclasse: item.codigo,
-              Descricao: capitalize(item.descricao),
-              Atividades: item.atividades,
-              Compreende: item.compreende,
-              CompreendeTambem: item.compreendeTambem,
-              NaoCompreende: item.naoCompreende
+              secao: item.classe.grupo.divisao.secao.codigo,
+              divisao: item.classe.grupo.divisao.codigo,
+              grupo: item.classe.grupo.codigo,
+              classe: item.classe.codigo,
+              subclasse: item.codigo,
+              descricao: capitalize(item.descricao),
+              atividades: item.atividades,
+              compreende: item.compreende,
+              compreendeTambem: item.compreendeTambem,
+              naoCompreende: item.naoCompreende
             });
 
-            console.log(subclasseCnae);
+            //console.log(subclasseCnae);
+            
+            x++;
+            console.log(x);
+            
+            //saveData(subclasseCnae);
 
             // var compreende = $("td[width='95%']").text();
             // console.log($("td[width='95%']"));
             // console.log(item.href);
 
         }
+        else
+        {
+            
+            console.log("error atividades", error);
+            
+        }
+        
+//        var stop = new Date().getTime();
+//                    while(new Date().getTime() < stop + 1000) {
+//                        ;
+//                    }
     });
 
 };
 
 var scrapSubclasses = function(item) {
-
+console.log(new Date());
+                    
+    var stop = new Date().getTime();
+    while(new Date().getTime() < stop + 1000) {
+                            ;
+    }
+                    
     request({ url:item.href, encoding: null }, function(error, response, html) {
+        if (response.statusCode != 200) {
+            html = iconv.decode(html, jschardet.detect(html).encoding);
+        console.log("error: ", item.href);
+        }
         if(!error) {
+            console.log("ok: ", new Date());
             html = iconv.decode(html, jschardet.detect(html).encoding);
 
             var $ = cheerio.load(html);
@@ -105,7 +135,7 @@ var scrapSubclasses = function(item) {
             $("td[width='105']").each(function() {
 
                 var parent = $(this).parent();
-
+                
                 var data = parent.children().eq(1).find("a");
                 var descricaoEl = parent.children().eq(2);
 
@@ -123,6 +153,7 @@ var scrapSubclasses = function(item) {
                 // console.log(subclasse);
 
                 item.subclasses.push(subclasse);
+                
                 scrapAtividades(subclasse);
 
                 // var subclasseCnae = ({
@@ -135,6 +166,12 @@ var scrapSubclasses = function(item) {
                 //   Descricao: capitalize(subclasse.descricao)
                 // });
             });
+        }
+        else
+        {
+            
+            console.log("error subclasses", error);
+            
         }
     });
 };
@@ -167,6 +204,8 @@ var scrapClasses = function(item) {
 
                 if (classe.codigo.length == 7) {
                     item.classes.push(classe);
+                    
+                    
                     scrapSubclasses(classe);
 
                     // console.log(classe.grupo.divisao.secao.codigo + " " +
@@ -177,12 +216,21 @@ var scrapClasses = function(item) {
                 }
             });
         }
+        else
+        {
+            
+            console.log("error classes", error);
+            
+        }
     });
 
 };
 
 var scrapGrupos = function(item) {
-
+    var stop = new Date().getTime();
+    while(new Date().getTime() < stop + 2000) {
+                            ;
+    }
     request({ url:item.href, encoding: null }, function(error, response, html) {
         if(!error) {
             html = iconv.decode(html, jschardet.detect(html).encoding);
@@ -206,14 +254,21 @@ var scrapGrupos = function(item) {
 
                 if (grupo.codigo.length == 3) {
                     item.grupos.push(grupo);
+                  
                     scrapClasses(grupo);
 
-                    // console.log(grupo.divisao.secao.codigo + " " +
-                    //             grupo.divisao.codigo + " " +
-                    //             grupo.codigo + " " +
-                    //             grupo.descricao);
+//                     console.log(grupo.divisao.secao.codigo + " " +
+//                                 grupo.divisao.codigo + " " +
+//                                 grupo.codigo + " " +
+//                                 grupo.descricao);
                 }
             });
+        }
+        else
+        {
+            
+            console.log("error grupos", error);
+            
         }
     });
 
@@ -246,12 +301,18 @@ var scrapDivisoes = function(item) {
                     item.divisoes.push(divisao);
                     scrapGrupos(divisao);
 
-                    // console.log(divisao.secao.codigo + " " +
-                    //             divisao.codigo + " " +
-                    //             divisao.descricao);
+//                     console.log(divisao.secao.codigo + " " +
+//                                 divisao.codigo + " " +
+//                                 divisao.descricao);
                 }
 
             });
+        }
+        else
+        {
+            
+            console.log("error divisoes", error);
+            
         }
     });
 
@@ -264,6 +325,10 @@ var scrapSecoes = function () {
     options.headers['Content-Length'] = Buffer.byteLength("sourcepage=index&pesquisa=&tabelabusca=CNAE_202%40CNAE+2.2+-+Subclasses%400%40cnaefiscal%400&tipoordenacao=C");
 
     request.post(options, function(error, response, html) {
+        if (response.statusCode != 200) {
+        console.log(response.statusCode);
+        }
+            
         // console.log('return');
         if(!error) {
             html = iconv.decode(html, jschardet.detect(html).encoding);
@@ -286,13 +351,14 @@ var scrapSecoes = function () {
                     secoes.push(secao);
                     scrapDivisoes(secao);
 
-                    // console.log(secao.codigo + " " +
-                    //             secao.descricao);
+//                     console.log(secao.codigo + " " +
+//                                 secao.descricao);
                 }
             });
         }
         else {
           // console.log(request, options, error);
+          console.log("error secoes", error);
         }
     }).form(form);
 
@@ -319,3 +385,31 @@ scrapSecoes();
     //res.send('Check your console!')
 
 //exports = module.exports = app;
+
+//var time = 60000;
+//var stop = new Date().getTime();
+//   while(new Date().getTime() < stop + time) {
+//       ;
+//   }
+//
+//var readline = require('readline');
+//
+//var rl = readline.createInterface({
+//  input: process.stdin,
+//  output: process.stdout
+//});
+//
+//rl.question("What do you think of node.js? ", function(answer) {
+//  // TODO: Log the answer in a database
+//  console.log("Thank you for your valuable feedback:", answer);
+//
+//  rl.close();
+//});
+
+//function sleep(time, callback) {
+//    var stop = new Date().getTime();
+//    while(new Date().getTime() < stop + time) {
+//        ;
+//    }
+//    callback();
+//}
